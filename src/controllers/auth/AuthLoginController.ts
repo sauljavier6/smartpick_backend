@@ -23,7 +23,7 @@ export const login = async (req: any, res: any) => {
         Email: user.email
       },
       process.env.JWT_SECRET!,
-      { expiresIn: '1d' }
+      { expiresIn: '5m' }
     );
 
     res.cookie('token', token, {
