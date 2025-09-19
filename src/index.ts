@@ -7,12 +7,11 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 
 dotenv.config();
-const allowedOrigins = process.env.FRONTEND_ORIGINS?.split(',') || [];
+const FRONTEND = process.env.FRONTEND_ORIGINS;
 
 const app = express();
 app.use(morgan('dev'));
 
-const FRONTEND = "http://192.168.22.103:5173"; 
 
 app.use(cors({
   origin: FRONTEND,
