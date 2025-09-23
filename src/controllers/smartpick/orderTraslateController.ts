@@ -7,6 +7,7 @@ import { getOrdersItems, getOrdersTraslate, getOrderTraslate } from "../../servi
 import PDFDocument from "pdfkit";
 import { Request, Response } from "express";
 import sequelize from "../../config/database";
+import ExcelJS from "exceljs";
 
 export const getData = async (req: any, res: any) => {
   try {
@@ -39,7 +40,6 @@ export const getData = async (req: any, res: any) => {
 
 export const getDatawithItems = async (req: any, res: any) => {
   const { id, idpicker } = req.params;
-  console.log('entro al metodo', id, idpicker)
   const t = await sequelize.transaction();
   try {
     
@@ -53,6 +53,7 @@ export const getDatawithItems = async (req: any, res: any) => {
     let departamento;
 
     if (data) {
+      console.log('los datos fueron obtenidos desde la bd postgre')
       items = await Orderitem.findAll({ where: { tranid: id, State: true }, transaction: t });
       departamento = await Orderdep.findAll({ 
         where: { 
@@ -69,6 +70,7 @@ export const getDatawithItems = async (req: any, res: any) => {
     }
 
     if (!data) {
+      console.log('los datos fueron obtenidos desde la bd sql server')
       const order = await getOrderTraslate(id);
 
       data = await Order.create({
@@ -89,11 +91,12 @@ export const getDatawithItems = async (req: any, res: any) => {
           item: item.item,
           tranid: order.tranid,
           memo: item.memo,
-          upccode: item.upccode,
+          upccode: item.upccode ?? "",
           categoria: item.categoria,
           departamento: item.departamento,
           iddepartamento: item.iddepartamento,
           quantity: item.quantity,
+          line: item.line,
           custitem_nso_codigo_citadel: item.custitem_nso_codigo_citadel,
         })),
         { transaction: t }
@@ -133,7 +136,6 @@ export const getDatawithItems = async (req: any, res: any) => {
 
 
 export const updateOrderDep = async (req: any, res: any) => {
-  console.log('entro al metodo')
     const { id, idpicker, tranid } = req.params;
 
   try {
@@ -369,4 +371,61 @@ export const printOrder = async (req: Request, res: Response) => {
   doc.fontSize(10).fillColor("#555").text(`Total de productos: ${items.length}`, 50, y + 20);
 
   doc.end();
+};
+
+
+
+export const exportOrderExcel = async (req: Request, res: Response) => {
+  try {
+    const { tranid } = req.params;
+
+    const orden = await Order.findOne({
+      where: { tranid, State: true },
+    });
+    if (!orden) return res.status(404).json({ message: "Orden no encontrada" });
+
+    const items = await Orderitem.findAll({
+      where: { tranid, State: true },
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Orden de Traslado");
+
+    worksheet.columns = [
+      { header: "External_ID", key: "External_ID", width: 30 },
+      { header: "Created_From", key: "Created_From", width: 10 },
+      { header: "Item", key: "Item", width: 20 },
+      { header: "Quantity", key: "Quantity", width: 20 },
+      { header: "Location", key: "Location", width: 20 },
+      { header: "Ship_Date", key: "Ship_Date", width: 20 },
+      { header: "line", key: "line", width: 20 },
+    ];
+
+    items.forEach((item) => {
+      worksheet.addRow({
+        External_ID: item.memo,
+        Created_From: '',
+        Item: item.item,
+        Quantity: item.quantity,
+        Location: orden.transferlocation,
+        Ship_Date: orden.trandate.toLocaleDateString(),
+        line: item.id,  
+      });
+    });
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=ot-${tranid}.xlsx`
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error("❌ Error al generar Excel:", error);
+    res.status(500).send("Error generando Excel");
+  }
 };

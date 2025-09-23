@@ -1,7 +1,5 @@
 import { SerialPort } from 'serialport';
 
-SerialPort.list().then(ports => console.log(ports));
-
 function buildLabel(code: string, desc: string) {
   return `
 ! 0 200 200 320 1

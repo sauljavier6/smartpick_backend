@@ -59,6 +59,12 @@ export default class Orderitem extends Model {
 
   @Column({
     type: DataType.STRING,
+    allowNull: false,
+  })
+  declare line: string;
+
+  @Column({
+    type: DataType.STRING,
     allowNull: true,
   })
   declare custitem_nso_codigo_citadel: string;
