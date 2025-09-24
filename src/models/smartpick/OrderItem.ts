@@ -16,6 +16,11 @@ export default class Orderitem extends Model {
   declare item: number;
 
   @Column({
+    type: DataType.INTEGER,
+  })
+  declare itemid: number;
+
+  @Column({
     type: DataType.STRING,
     allowNull: false,
   })

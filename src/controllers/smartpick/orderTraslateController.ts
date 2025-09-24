@@ -89,6 +89,7 @@ export const getDatawithItems = async (req: any, res: any) => {
       items = await Orderitem.bulkCreate(
         itemsdata.map((item) => ({
           item: item.item,
+          itemid: item.itemid,
           tranid: order.tranid,
           memo: item.memo,
           upccode: item.upccode ?? "",
@@ -392,24 +393,24 @@ export const exportOrderExcel = async (req: Request, res: Response) => {
     const worksheet = workbook.addWorksheet("Orden de Traslado");
 
     worksheet.columns = [
-      { header: "External_ID", key: "External_ID", width: 30 },
-      { header: "Created_From", key: "Created_From", width: 10 },
-      { header: "Item", key: "Item", width: 20 },
-      { header: "Quantity", key: "Quantity", width: 20 },
-      { header: "Location", key: "Location", width: 20 },
-      { header: "Ship_Date", key: "Ship_Date", width: 20 },
-      { header: "line", key: "line", width: 20 },
+      { header: "External_ID", key: "External_ID", width: 10 },
+      { header: "Created_From", key: "Created_From", width: 20 },
+      { header: "Item", key: "Item", width: 10 },
+      { header: "Quantity", key: "Quantity", width: 10 },
+      { header: "Location", key: "Location", width: 10 },
+      { header: "Ship_Date", key: "Ship_Date", width: 10 },
+      { header: "line", key: "line", width: 10 },
     ];
 
     items.forEach((item) => {
       worksheet.addRow({
-        External_ID: item.memo,
-        Created_From: '',
-        Item: item.item,
+        External_ID: item.tranid,
+        Created_From: 'Orden de traslado #' + orden.tranid,
+        Item: item.itemid,
         Quantity: item.quantity,
         Location: orden.transferlocation,
-        Ship_Date: orden.trandate.toLocaleDateString(),
-        line: item.id,  
+        Ship_Date: orden.trandate.toLocaleDateString("en-US"),
+        line: item.line,  
       });
     });
 

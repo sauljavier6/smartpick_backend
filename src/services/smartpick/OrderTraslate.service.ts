@@ -57,7 +57,7 @@ export async function getOrdersItems(id: string) {
     const orden = await querySqlServer(
       `
       SELECT * FROM OPENQUERY(NS_CLIENTE, '
-          SELECT tl.item,tl.memo, tl.quantity, i.upccode, Builtin.DF(i.custitem_nso_categoria_articulo) categoria, i.custitem_nso_codigo_citadel, 
+          SELECT tl.item, i.itemid,tl.memo, tl.quantity, i.upccode, Builtin.DF(i.custitem_nso_categoria_articulo) categoria, i.custitem_nso_codigo_citadel, 
           Builtin.DF(i.custitem_nso_departamento_articulo) departamento, i.custitem_nso_departamento_articulo iddepartamento, tl.id line
           FROM transactionline tl
           Inner join transaction t on tl.transaction=t.id
