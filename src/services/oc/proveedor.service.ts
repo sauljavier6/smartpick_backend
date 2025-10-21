@@ -8,7 +8,7 @@ export async function getProveedoresFromNetSuite(proveedor: string) {
         select distinct iv.vendor as iv_vendor, v.altname as v_altname,v.companyname as v_companyname from itemVendor iv 
             left join vendor v on v.id=iv.vendor
             where v.isinactive=''F'' and  v.custentityes_acreedor=''1''
-            AND v.companyname LIKE ''%${proveedor}%''
+            AND UPPER(v.companyname) LIKE UPPER(''${proveedor}%'')
       ')
       `, 
       [
