@@ -20,7 +20,24 @@ export default class Product extends Model {
     type: DataType.STRING,
     allowNull: false,
   })
-  declare Code: string;
+  declare SKU: string;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: false,
+  })
+  declare Marca: string;
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: false,
+  })
+  declare Pais: string;
+
+  @Column({
+    type: DataType.INTEGER,
+  })
+  declare ID_Categoria: number;
 
   @Column({
     type: DataType.STRING,

@@ -1,4 +1,5 @@
-import { SerialPort } from 'serialport';
+import { SerialPort } from "serialport";
+import { getOfertasdata } from "../../services/generator/generator";
 
 function buildLabel(code: string, desc: string) {
   return `
@@ -10,16 +11,20 @@ PRINT
   `;
 }
 
-export async function printLabelBluetooth(portName: string, code: string, desc: string) {
+export async function printLabelBluetooth(
+  portName: string,
+  code: string,
+  desc: string
+) {
   return new Promise((resolve, reject) => {
     const port = new SerialPort({
       path: portName,
       baudRate: 9600,
       dataBits: 8,
       stopBits: 1,
-      parity: 'none',
+      parity: "none",
       xon: true,
-      xoff: true
+      xoff: true,
     });
 
     const label = buildLabel(code, desc);
@@ -34,22 +39,20 @@ export async function printLabelBluetooth(portName: string, code: string, desc: 
   });
 }
 
-
-
 async function findPrinterPort() {
   const ports = await SerialPort.list();
-  
-  // filtra usando manufacturer o pnpId
-  const printer = ports.find(p =>
-    (p.manufacturer && p.manufacturer.includes("Microsoft")) &&
-    (p.pnpId && p.pnpId.includes("BTHENUM"))
+
+  const printer = ports.find(
+    (p) =>
+      p.manufacturer &&
+      p.manufacturer.includes("Microsoft") &&
+      p.pnpId &&
+      p.pnpId.includes("BTHENUM")
   );
 
   if (!printer) throw new Error("No se encontró la impresora");
   return printer.path;
 }
-
-
 
 export const toPrint = async (req: any, res: any) => {
   const { code, desc } = req.body;
@@ -62,3 +65,13 @@ export const toPrint = async (req: any, res: any) => {
   }
 };
 
+export const getOfertas = async (req: any, res: any) => {
+  const sucursal = req.query.sucursal;
+  try {
+    const data = await getOfertasdata(sucursal);
+
+    res.json({ message: 'success', data });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err });
+  }
+};

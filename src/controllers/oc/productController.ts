@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import Product from '../../models/producto';
+import Product from '../../models/uva/producto';
 import { getItemsFromNetSuite } from '../../services/oc/item.service';
 
 // GET /api/product

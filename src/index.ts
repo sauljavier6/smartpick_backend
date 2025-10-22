@@ -5,6 +5,7 @@ import sequelize from "./config/database";
 import indexRoutes from './routes/index';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
+import path from "path"; 
 
 dotenv.config();
 const FRONTEND = process.env.FRONTEND_ORIGINS;
@@ -19,6 +20,8 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 app.use(cookieParser());
 
