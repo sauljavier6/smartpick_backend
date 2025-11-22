@@ -4,10 +4,22 @@ import PDFDocument from "pdfkit";
 import bwipjs from "bwip-js";
 
 const formatDate = (date: Date | string) => {
+  if (!date) return "";
+
+  // Si viene como string tipo "30-11-2025"
+  if (typeof date === "string" && /^\d{2}-\d{2}-\d{4}$/.test(date)) {
+    const [day, month, year] = date.split("-");
+    return `${day}/${month}/${year}`;
+  }
+
+  // Si viene como ISO, Date, timestamp, etc.
   const d = new Date(date);
+  if (isNaN(d.getTime())) return ""; // evitar NaN/NaN/NaN
+
   const day = String(d.getDate()).padStart(2, "0");
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = d.getFullYear();
+
   return `${day}/${month}/${year}`;
 };
 
@@ -132,118 +144,101 @@ export const printCenefa = async (req: any, res: any) => {
   }
 };
 
-export const printCenefaByData = async (req: any, res: any) => {
-  const productos = req.body.productos;
-
-  console.log(productos); // aquí ya llegan
+export const printPrecios = async (req: any, res: any) => {
+  const { ID_User } = req.params;
 
   try {
-    //const productos = await ProductToPrint.findAll({ where: { ID_User } });
+    const productos = await ProductToPrint.findAll({ where: { ID_User } });
 
-    // MEDIDAS CONVERTIDAS A PIXELES
-    const marginLeft = 71; // 2.5 cm
-    const marginRight = 71; // 2.5 cm
-    const marginTop = 45; // 1.6 cm
-    const marginBottom = 45; // 1.6 cm
+    // MEDIDAS EN MILÍMETROS
+    const mm = (val: number) => val * 2.83465; // conversión mm → puntos PDF
 
-    const cenefaWidth = 215; // 7.6 cm
-    const cenefaHeight = 261; // 9.2 cm
+    const etiquetaWidth = mm(45);
+    const etiquetaHeight = mm(26);
+
+    // MÁRGENES REQUERIDOS
+    const marginLeft = mm(13); // 1.3 cm
+    const marginTop = mm(20); // 2 cm
 
     const doc = new PDFDocument({
       size: "LETTER",
-      layout: "landscape",
+      layout: "portrait",
       margins: {
         top: marginTop,
         left: marginLeft,
-        right: marginRight,
-        bottom: marginBottom,
+        right: marginLeft,
+        bottom: marginTop,
       },
     });
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", "inline; filename=cenefa.pdf");
-
+    res.setHeader("Content-Disposition", "inline; filename=etiquetas.pdf");
     doc.pipe(res);
 
-    const usableWidth = doc.page.width - marginLeft - marginRight;
-    const usableHeight = doc.page.height - marginTop - marginBottom;
+    const usableWidth = doc.page.width - marginLeft * 2;
+    const usableHeight = doc.page.height - marginTop * 2;
 
-    const cols = Math.floor(usableWidth / cenefaWidth);
-    const rows = Math.floor(usableHeight / cenefaHeight);
-
-    const cenefasPorPagina = cols * rows;
+    const cols = Math.floor(usableWidth / etiquetaWidth);
+    const rows = Math.floor(usableHeight / etiquetaHeight);
+    const etiquetasPorPagina = cols * rows;
 
     let index = 0;
 
-    for (let p of productos) {
+    for (const p of productos) {
       const col = index % cols;
       const row = Math.floor(index / cols) % rows;
 
-      const x = marginLeft + col * cenefaWidth;
-      const y = marginTop + row * cenefaHeight;
+      const x = marginLeft + col * etiquetaWidth;
+      const y = marginTop + row * etiquetaHeight;
 
-      // ---- CONTENIDO DE CENEFA ----
+      // ======= CONTENIDO DE LA ETIQUETA =======
 
-      doc.fontSize(10).text(p.NombreProveedor, x, y);
+      // Proveedor
+      doc.fontSize(6).text(p.NombreProveedor, x, y);
 
+      // Descripción
       doc
-        .fontSize(12)
+        .fontSize(7)
         .font("Helvetica-Bold")
-        .text(p.Description, x, y + 15, { width: cenefaWidth - 20 });
+        .text(p.Description, x, y + mm(4), {
+          width: etiquetaWidth - mm(4),
+        });
 
-      doc.rect(x, y + 50, 120, 40).fill("#F4D03F");
-      doc
-        .fillColor("black")
-        .fontSize(26)
-        .text(`$${p.Precio_Venta}`, x + 5, y + 55);
-
-      const barcodePng = await bwipjs.toBuffer({
+      // ===== CÓDIGO DE BARRAS ARRIBA DEL PRECIO =====
+      const barcode = await bwipjs.toBuffer({
         bcid: "code128",
         text: p.Upc,
-        scale: 1,
-        height: 6,
+        scale: 2,
+        height: 8,
         includetext: false,
       });
 
-      const barcodeWidth = 70;
-      const barcodeHeight = 28;
-
-      doc.image(barcodePng, x + cenefaWidth - barcodeWidth - 20, y + 50, {
-        width: barcodeWidth,
-        height: barcodeHeight,
+      // Código de barras arriba
+      doc.image(barcode, x + mm(2), y + mm(10), {
+        width: mm(30),
+        height: mm(7),
       });
 
-      doc
-        .fontSize(9)
-        .text(
-          p.Upc,
-          x + cenefaWidth - barcodeWidth - 20,
-          y + 50 + barcodeHeight + 3
-        );
+      // ===== PRECIO + UPC + ITEMCODE EN PARALELO =====
 
-      doc.rect(x, y + 110, cenefaWidth - 20, 35).fill("#B03A2E");
+      // Coordenadas base
+      const precioX = x + mm(2);
+      const precioY = y + mm(18);
 
-      doc
-        .fillColor("white")
-        .fontSize(26)
-        .text("Especial", x + (cenefaWidth - 20) / 2 - 40, y + 113);
+      const upcX = x + etiquetaWidth - mm(18); // derecha
+      const upcY = precioY;
 
-      doc
-        .fillColor("black")
-        .fontSize(26)
-        .text(`$${p.Precio_especial || "-"}`, x + 65, y + 150);
+      // Precio
+      doc.fontSize(18).text(`$${p.Precio_Venta}`, precioX, precioY);
 
-      doc
-        .fontSize(10)
-        .text(
-          `Vigencia: ${formatDate(p.Fecha_Ini)} al ${formatDate(p.Fecha_Fin)}`,
-          x + 5,
-          y + 190
-        );
+      // UPC encima del item_code
+      doc.fontSize(6).text(p.Upc, upcX, upcY);
+      doc.fontSize(6).text(p.item_code, upcX, upcY + mm(3.5));
 
+      // ======= CONTROL DE PÁGINAS =======
       index++;
 
-      if (index % cenefasPorPagina === 0 && index < productos.length) {
+      if (index % etiquetasPorPagina === 0 && index < productos.length) {
         doc.addPage();
       }
     }
@@ -272,6 +267,17 @@ export const getOfertasByUpc = async (req: any, res: any) => {
     const data = await getIdByUpc(upc);
 
     res.json({ message: "success", data });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err });
+  }
+};
+
+export const getProductsToPrint = async (req: any, res: any) => {
+  const ID_User = req.query.ID_User;
+  try {
+    const data = await ProductToPrint.findAll({ where: { ID_User: ID_User } });
+
+    res.json(data);
   } catch (err) {
     res.status(500).json({ ok: false, error: err });
   }
@@ -390,17 +396,6 @@ export const postProductForPrint = async (req: any, res: any) => {
   }
 };
 
-export const getProductsToPrint = async (req: any, res: any) => {
-  const ID_User = req.query.ID_User;
-  try {
-    const data = await ProductToPrint.findAll({ where: { ID_User: ID_User } });
-
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err });
-  }
-};
-
 export const deleteProductsForPrint = async (req: any, res: any) => {
   const { ID_User } = req.query;
 
@@ -413,5 +408,234 @@ export const deleteProductsForPrint = async (req: any, res: any) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: err });
+  }
+};
+
+//post /print/bydata
+
+export const printCenefaByData = async (req: any, res: any) => {
+  const productos = req.body.Productos;
+
+  console.log(productos); // aquí ya llegan
+
+  try {
+    // MEDIDAS CONVERTIDAS A PIXELES
+    const marginLeft = 71; // 2.5 cm
+    const marginRight = 71; // 2.5 cm
+    const marginTop = 45; // 1.6 cm
+    const marginBottom = 45; // 1.6 cm
+
+    const cenefaWidth = 215; // 7.6 cm
+    const cenefaHeight = 261; // 9.2 cm
+
+    const doc = new PDFDocument({
+      size: "LETTER",
+      layout: "landscape",
+      margins: {
+        top: marginTop,
+        left: marginLeft,
+        right: marginRight,
+        bottom: marginBottom,
+      },
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "inline; filename=cenefa.pdf");
+
+    doc.pipe(res);
+
+    const usableWidth = doc.page.width - marginLeft - marginRight;
+    const usableHeight = doc.page.height - marginTop - marginBottom;
+
+    const cols = Math.floor(usableWidth / cenefaWidth);
+    const rows = Math.floor(usableHeight / cenefaHeight);
+
+    const cenefasPorPagina = cols * rows;
+
+    let index = 0;
+
+    for (let p of productos) {
+      const col = index % cols;
+      const row = Math.floor(index / cols) % rows;
+
+      const x = marginLeft + col * cenefaWidth;
+      const y = marginTop + row * cenefaHeight;
+
+      // ---- CONTENIDO DE CENEFA ----
+
+      doc.fontSize(8).text(p.nombreProveedor, x, y);
+
+      doc
+        .fontSize(10)
+        .font("Helvetica-Bold")
+        .text(p.DESCRIPCION, x, y + 15, { width: cenefaWidth - 20 });
+
+      doc.rect(x, y + 50, 120, 40).fill("#F4D03F");
+      doc
+        .fillColor("black")
+        .fontSize(26)
+        .text(`$${p.Precio_Venta}`, x + 5, y + 55);
+
+      const barcodePng = await bwipjs.toBuffer({
+        bcid: "code128",
+        text: p.upc,
+        scale: 1,
+        height: 6,
+        includetext: false,
+      });
+
+      const barcodeWidth = 70;
+      const barcodeHeight = 28;
+
+      doc.image(barcodePng, x + cenefaWidth - barcodeWidth - 20, y + 50, {
+        width: barcodeWidth,
+        height: barcodeHeight,
+      });
+
+      doc
+        .fontSize(9)
+        .text(
+          p.upc,
+          x + cenefaWidth - barcodeWidth - 20,
+          y + 50 + barcodeHeight + 3
+        );
+
+      doc.rect(x, y + 110, cenefaWidth - 20, 35).fill("#B03A2E");
+
+      doc
+        .fillColor("white")
+        .fontSize(26)
+        .text("Especial", x + (cenefaWidth - 20) / 2 - 40, y + 113);
+
+      doc
+        .fillColor("black")
+        .fontSize(26)
+        .text(`$${p.PRECIO_ESPECIAL || "-"}`, x + 65, y + 150);
+
+      doc
+        .fontSize(10)
+        .text(
+          `Vigencia: ${formatDate(p.Fecha_Ini)} al ${formatDate(p.Fecha_Fin)}`,
+          x + 5,
+          y + 190
+        );
+
+      index++;
+
+      if (index % cenefasPorPagina === 0 && index < productos.length) {
+        doc.addPage();
+      }
+    }
+
+    doc.end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error generando PDF" });
+  }
+};
+
+export const printPrecioByData = async (req: any, res: any) => {
+  const productos = req.body.Productos;
+
+  console.log(productos); // aquí ya llegan
+
+  try {
+    // MEDIDAS EN MILÍMETROS
+    const mm = (val: number) => val * 2.83465; // conversión mm → puntos PDF
+
+    const etiquetaWidth = mm(45);
+    const etiquetaHeight = mm(26);
+
+    // MÁRGENES REQUERIDOS
+    const marginLeft = mm(13); // 1.3 cm
+    const marginTop = mm(20); // 2 cm
+
+    const doc = new PDFDocument({
+      size: "LETTER",
+      layout: "portrait",
+      margins: {
+        top: marginTop,
+        left: marginLeft,
+        right: marginLeft,
+        bottom: marginTop,
+      },
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "inline; filename=etiquetas.pdf");
+    doc.pipe(res);
+
+    const usableWidth = doc.page.width - marginLeft * 2;
+    const usableHeight = doc.page.height - marginTop * 2;
+
+    const cols = Math.floor(usableWidth / etiquetaWidth);
+    const rows = Math.floor(usableHeight / etiquetaHeight);
+    const etiquetasPorPagina = cols * rows;
+
+    let index = 0;
+
+    for (const p of productos) {
+      const col = index % cols;
+      const row = Math.floor(index / cols) % rows;
+
+      const x = marginLeft + col * etiquetaWidth;
+      const y = marginTop + row * etiquetaHeight;
+
+      // ======= CONTENIDO DE LA ETIQUETA =======
+
+      // Proveedor
+      doc.fontSize(6).text(p.nombreProveedor, x, y);
+
+      // Descripción
+      doc
+        .fontSize(7)
+        .font("Helvetica-Bold")
+        .text(p.DESCRIPCION, x, y + mm(4), {
+          width: etiquetaWidth - mm(4),
+        });
+
+      // ===== CÓDIGO DE BARRAS ARRIBA DEL PRECIO =====
+      const barcode = await bwipjs.toBuffer({
+        bcid: "code128",
+        text: p.upc,
+        scale: 2,
+        height: 8,
+        includetext: false,
+      });
+
+      // Código de barras arriba
+      doc.image(barcode, x + mm(2), y + mm(10), {
+        width: mm(30),
+        height: mm(7),
+      });
+
+      // ===== PRECIO + UPC + ITEMCODE EN PARALELO =====
+
+      // Coordenadas base
+      const precioX = x + mm(2);
+      const precioY = y + mm(18);
+
+      const upcX = x + etiquetaWidth - mm(18); // derecha
+      const upcY = precioY;
+
+      // Precio
+      doc.fontSize(18).text(`$${p.Precio_Venta}`, precioX, precioY);
+
+      // UPC encima del item_code
+      doc.fontSize(6).text(p.upc, upcX, upcY);
+      doc.fontSize(6).text(p.item_code, upcX, upcY + mm(3.5));
+
+      // ======= CONTROL DE PÁGINAS =======
+      index++;
+
+      if (index % etiquetasPorPagina === 0 && index < productos.length) {
+        doc.addPage();
+      }
+    }
+
+    doc.end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error generando PDF" });
   }
 };
