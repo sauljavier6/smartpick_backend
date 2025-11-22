@@ -7,6 +7,7 @@ import Orderitem from '../models/smartpick/OrderItem';
 import Orderdep from '../models/smartpick/OrderDep';
 import Location from '../models/smartpick/Location';
 import LocationLp from '../models/smartpick/LocationLP';
+import ProductToPrint from '../models/generator/ProductToPrint';
 
 
 dotenv.config();
@@ -18,7 +19,7 @@ const sequelize = new Sequelize({
   username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  models: [Product, Order, Orderitem, Orderdep, Location, LocationLp],
+  models: [Product, Order, Orderitem, Orderdep, Location, LocationLp, ProductToPrint],
   logging: false,
 });
 
