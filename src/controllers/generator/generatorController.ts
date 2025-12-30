@@ -1,4 +1,4 @@
-import { getIdByUpc, getOfertasdata } from "../../services/generator/generator";
+import { getIdByUpc, getItemsByUpc, getOfertasdata } from "../../services/generator/generator";
 import ProductToPrint from "../../models/generator/ProductToPrint";
 import PDFDocument from "pdfkit";
 import bwipjs from "bwip-js";
@@ -38,6 +38,9 @@ export const printCenefa = async (req: any, res: any) => {
     const cenefaWidth = 215; // 7.6 cm
     const cenefaHeight = 261; // 9.2 cm
 
+    const offsetX = 10; // mueve 10px a la derecha
+
+
     const doc = new PDFDocument({
       size: "LETTER",
       layout: "landscape",
@@ -65,6 +68,22 @@ export const printCenefa = async (req: any, res: any) => {
     let index = 0;
 
     for (let p of productos) {
+      let precioFinal;
+
+      // Caso 1: Precio Fijo
+      if (p.Tipo_promo === "Precio Fijo") {
+          precioFinal = p.Precio_especial;
+      } 
+      // Caso 2: Porcentaje
+      else {
+          const precioVenta = Number(p.Precio_Venta) || 0;
+          const porcentaje = Number(p.Precio_especial) || 0;
+
+          precioFinal = precioVenta - (precioVenta * (porcentaje / 100));
+      }
+      // Si no hay precio, mostrar "-"
+      const mostrarPrecio = precioFinal ? `$${precioFinal}` : "-";
+
       const col = index % cols;
       const row = Math.floor(index / cols) % rows;
 
@@ -73,18 +92,17 @@ export const printCenefa = async (req: any, res: any) => {
 
       // ---- CONTENIDO DE CENEFA ----
 
-      doc.fontSize(10).text(p.NombreProveedor, x, y);
+      doc.fontSize(8).text(p.NombreProveedor, x + 10, y);
 
       doc
-        .fontSize(12)
+        .fontSize(8)
         .font("Helvetica-Bold")
-        .text(p.Description, x, y + 15, { width: cenefaWidth - 20 });
+        .text(p.Description, x + 10, y + 15, { width: cenefaWidth - 20 });
 
-      doc.rect(x, y + 50, 120, 40).fill("#F4D03F");
       doc
         .fillColor("black")
         .fontSize(26)
-        .text(`$${p.Precio_Venta}`, x + 5, y + 55);
+        .text(`$${p.Precio_Venta}`, x + 10, y + 50);
 
       const barcodePng = await bwipjs.toBuffer({
         bcid: "code128",
@@ -97,7 +115,7 @@ export const printCenefa = async (req: any, res: any) => {
       const barcodeWidth = 70;
       const barcodeHeight = 28;
 
-      doc.image(barcodePng, x + cenefaWidth - barcodeWidth - 20, y + 50, {
+      doc.image(barcodePng, x + cenefaWidth - barcodeWidth - 20, y + 45, {
         width: barcodeWidth,
         height: barcodeHeight,
       });
@@ -110,23 +128,22 @@ export const printCenefa = async (req: any, res: any) => {
           y + 50 + barcodeHeight + 3
         );
 
-      doc.rect(x, y + 110, cenefaWidth - 20, 35).fill("#B03A2E");
 
       doc
         .fillColor("white")
         .fontSize(26)
-        .text("Especial", x + (cenefaWidth - 20) / 2 - 40, y + 113);
+        .text("Especial", x + (cenefaWidth - 20) / 2 - 40, y + 118);
 
       doc
         .fillColor("black")
         .fontSize(26)
-        .text(`$${p.Precio_especial || "-"}`, x + 65, y + 150);
+        .text(`${mostrarPrecio}`, x + 70, y + 160);
 
       doc
         .fontSize(10)
         .text(
           `Vigencia: ${formatDate(p.Fecha_Ini)} al ${formatDate(p.Fecha_Fin)}`,
-          x + 5,
+          x + 20,
           y + 190
         );
 
@@ -154,11 +171,15 @@ export const printPrecios = async (req: any, res: any) => {
     const mm = (val: number) => val * 2.83465; // conversión mm → puntos PDF
 
     const etiquetaWidth = mm(45);
-    const etiquetaHeight = mm(26);
+    const etiquetaHeight = mm(29.9);
 
     // MÁRGENES REQUERIDOS
-    const marginLeft = mm(13); // 1.3 cm
+    const marginLeft = mm(17); // 1.3 cm
     const marginTop = mm(20); // 2 cm
+
+    // SEPARACIÓN ENTRE COLUMNAS
+    const colSpacing = mm(2); 
+
 
     const doc = new PDFDocument({
       size: "LETTER",
@@ -188,7 +209,7 @@ export const printPrecios = async (req: any, res: any) => {
       const col = index % cols;
       const row = Math.floor(index / cols) % rows;
 
-      const x = marginLeft + col * etiquetaWidth;
+      const x = marginLeft + col * (etiquetaWidth + colSpacing);
       const y = marginTop + row * etiquetaHeight;
 
       // ======= CONTENIDO DE LA ETIQUETA =======
@@ -262,15 +283,25 @@ export const getOfertas = async (req: any, res: any) => {
 };
 
 export const getOfertasByUpc = async (req: any, res: any) => {
-  const upc = req.query.upc;
+  const upc = String(req.query.upc || "").trim();
+
   try {
-    const data = await getIdByUpc(upc);
+    // 1️⃣ Intento con el UPC original
+    let data = await getIdByUpc(upc);
+
+    // 2️⃣ Si no encontró nada, intento con "0" + UPC
+    if (!data || data.length === 0) {
+      const upcConCero = "0" + upc;
+      data = await getIdByUpc(upcConCero);
+    }
 
     res.json({ message: "success", data });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ ok: false, error: err });
   }
 };
+
 
 export const getProductsToPrint = async (req: any, res: any) => {
   const ID_User = req.query.ID_User;
@@ -414,11 +445,11 @@ export const deleteProductsForPrint = async (req: any, res: any) => {
 //post /print/bydata
 
 export const printCenefaByData = async (req: any, res: any) => {
-  const productos = req.body.Productos;
-
-  console.log(productos); // aquí ya llegan
+  const Upc = req.body.Upc;
 
   try {
+
+    const productos = await getItemsByUpc(Upc);
     // MEDIDAS CONVERTIDAS A PIXELES
     const marginLeft = 71; // 2.5 cm
     const marginRight = 71; // 2.5 cm
@@ -455,6 +486,22 @@ export const printCenefaByData = async (req: any, res: any) => {
     let index = 0;
 
     for (let p of productos) {
+      let precioFinal;
+
+      // Caso 1: Precio Fijo
+      if (p.TIPO_PROMO === "Precio Fijo") {
+          precioFinal = p.PRECIO_ESPECIAL;
+      } 
+      // Caso 2: Porcentaje
+      else {
+          const precioVenta = Number(p.Precio_Venta) || 0;
+          const porcentaje = Number(p.PRECIO_ESPECIAL) || 0;
+
+          precioFinal = precioVenta - (precioVenta * (porcentaje / 100));
+      }
+      // Si no hay precio, mostrar "-"
+      const mostrarPrecio = precioFinal ? `$${precioFinal}` : "-";
+
       const col = index % cols;
       const row = Math.floor(index / cols) % rows;
 
@@ -463,18 +510,17 @@ export const printCenefaByData = async (req: any, res: any) => {
 
       // ---- CONTENIDO DE CENEFA ----
 
-      doc.fontSize(8).text(p.nombreProveedor, x, y);
+      doc.fontSize(8).text(p.nombreProveedor, x + 10, y);
 
       doc
-        .fontSize(10)
+        .fontSize(8)
         .font("Helvetica-Bold")
-        .text(p.DESCRIPCION, x, y + 15, { width: cenefaWidth - 20 });
+        .text(p.DESCRIPCION, x + 10, y + 15, { width: cenefaWidth - 20 });
 
-      doc.rect(x, y + 50, 120, 40).fill("#F4D03F");
       doc
         .fillColor("black")
         .fontSize(26)
-        .text(`$${p.Precio_Venta}`, x + 5, y + 55);
+        .text(`$${p.Precio_Venta}`, x + 10, y + 55);
 
       const barcodePng = await bwipjs.toBuffer({
         bcid: "code128",
@@ -500,7 +546,6 @@ export const printCenefaByData = async (req: any, res: any) => {
           y + 50 + barcodeHeight + 3
         );
 
-      doc.rect(x, y + 110, cenefaWidth - 20, 35).fill("#B03A2E");
 
       doc
         .fillColor("white")
@@ -510,13 +555,13 @@ export const printCenefaByData = async (req: any, res: any) => {
       doc
         .fillColor("black")
         .fontSize(26)
-        .text(`$${p.PRECIO_ESPECIAL || "-"}`, x + 65, y + 150);
+        .text(`${mostrarPrecio}`, x + 70, y + 160);
 
       doc
         .fontSize(10)
         .text(
           `Vigencia: ${formatDate(p.Fecha_Ini)} al ${formatDate(p.Fecha_Fin)}`,
-          x + 5,
+          x + 20,
           y + 190
         );
 
@@ -535,20 +580,23 @@ export const printCenefaByData = async (req: any, res: any) => {
 };
 
 export const printPrecioByData = async (req: any, res: any) => {
-  const productos = req.body.Productos;
-
-  console.log(productos); // aquí ya llegan
+  const Upc = req.body.Upc;
 
   try {
+
+    const productos = await getItemsByUpc(Upc);
     // MEDIDAS EN MILÍMETROS
     const mm = (val: number) => val * 2.83465; // conversión mm → puntos PDF
 
     const etiquetaWidth = mm(45);
-    const etiquetaHeight = mm(26);
+    const etiquetaHeight = mm(29.9); 
 
     // MÁRGENES REQUERIDOS
-    const marginLeft = mm(13); // 1.3 cm
+    const marginLeft = mm(17); // 1.3 cm
     const marginTop = mm(20); // 2 cm
+
+    // SEPARACIÓN ENTRE COLUMNAS
+    const colSpacing = mm(2); 
 
     const doc = new PDFDocument({
       size: "LETTER",
@@ -578,7 +626,7 @@ export const printPrecioByData = async (req: any, res: any) => {
       const col = index % cols;
       const row = Math.floor(index / cols) % rows;
 
-      const x = marginLeft + col * etiquetaWidth;
+      const x = marginLeft + col * (etiquetaWidth + colSpacing);
       const y = marginTop + row * etiquetaHeight;
 
       // ======= CONTENIDO DE LA ETIQUETA =======
