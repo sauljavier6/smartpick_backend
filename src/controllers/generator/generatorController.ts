@@ -580,9 +580,7 @@ export const printCenefaByData = async (req: any, res: any) => {
 };
 
 export const printPrecioByData = async (req: any, res: any) => {
-  const productos = req.body.Productos;
-
-  console.log(productos); // aquí ya llegan
+  const Upc = req.body.Upc;
 
   try {
 
