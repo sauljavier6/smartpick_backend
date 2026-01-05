@@ -9,7 +9,7 @@ const sqlServerConfig: sql.config = {
   server: process.env.SQLSERVER_DP_SERVER!,
   database: process.env.SQLSERVER_DP_DATABASE!,
   options: {
-    encrypt: false, //true, desactivado solo en red local
+    encrypt: false,
     trustServerCertificate: true,
   },
 };
