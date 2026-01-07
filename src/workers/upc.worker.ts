@@ -2,23 +2,20 @@
 import cron from "node-cron";
 import { processUpcs } from "../services/products/upc.service";
 
-let isRunning = false;
+console.log("🟢 UPC Worker iniciado", new Date().toLocaleString());
 
+//DETERMINA EL TIEMPO DE EJECUCIÓN: CADA HORA
 cron.schedule("0 * * * *", async () => {
-  if (isRunning) {
-    console.log("⏭️ Cron saltado: proceso aún en ejecución");
-    return;
-  }
+//cron.schedule("*/1 * * * *", async () => {
 
-  isRunning = true;
   console.log("⏰ CRON disparado:", new Date().toLocaleString());
 
   try {
-    await processUpcs(20); // o el batch que quieras
-  } catch (error) {
-    console.error("❌ Error en cron UPC:", error);
-  } finally {
-    isRunning = false;
+    //DETERMINA NUMERO DE UPC A PROCESAR
+    await processUpcs(20);
     console.log("✅ Ciclo de UPC terminado:", new Date().toLocaleString());
+  } catch (error) {
+    console.error("❌ Error en worker UPC:", error);
   }
 });
+   
