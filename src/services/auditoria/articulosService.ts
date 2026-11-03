@@ -1,7 +1,7 @@
 import { querySqlServerDP, sql } from "../../config/sqlServerClientDP";
 
-export async function listarArticulos(op: { buscar: string; sucursal: string; pagina: number; limite: number }) {
-  const { buscar, sucursal, pagina, limite } = op;
+export async function listarArticulos(op: { buscar: string; sucursal: string; pagina: number; limite: number; exacto?: boolean }) {
+  const { buscar, sucursal, pagina, limite, exacto = false } = op;
   // OPENQUERY no admite parámetros. Solo se permiten identificadores alfanuméricos de sucursal.
   if (!/^[A-Za-z0-9 ]{1,20}$/.test(sucursal)) throw new Error("Sucursal inválida");
   const sucursalSql = sucursal.replace(/'/g, "''");
@@ -11,8 +11,9 @@ export async function listarArticulos(op: { buscar: string; sucursal: string; pa
       SELECT articulo, Precio_Venta, tecla, upc, nombreProveedor,
         ROW_NUMBER() OVER (PARTITION BY articulo ORDER BY Precio_Venta DESC, nombreProveedor ASC) AS rn
       FROM interfaces_netsuite.dbo.articuloExistencia
-      WHERE (@buscar = '' OR CAST(articulo AS VARCHAR(80)) LIKE '%' + @buscar + '%'
-        OR CAST(upc AS VARCHAR(80)) LIKE '%' + @buscar + '%')
+      WHERE (@exacto = 1 AND (CAST(articulo AS VARCHAR(80)) = @buscar OR CAST(upc AS VARCHAR(80)) = @buscar))
+         OR (@exacto = 0 AND (@buscar = '' OR CAST(articulo AS VARCHAR(80)) LIKE '%' + @buscar + '%'
+        OR CAST(upc AS VARCHAR(80)) LIKE '%' + @buscar + '%'))
     ),
     Promociones AS (
       SELECT * FROM OPENQUERY(DPC_CLIENTE, '
@@ -57,6 +58,7 @@ export async function listarArticulos(op: { buscar: string; sucursal: string; pa
   `;
   const data = await querySqlServerDP(query, [
     { name: "buscar", type: sql.VarChar(80), value: buscar },
+    { name: "exacto", type: sql.Bit, value: exacto },
     { name: "offset", type: sql.Int, value: offset },
     { name: "limite", type: sql.Int, value: limite },
   ]);
