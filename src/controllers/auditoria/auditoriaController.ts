@@ -83,3 +83,20 @@ export async function exportarArticulos(req: Request, res: Response) {
     else res.destroy(error instanceof Error ? error : new Error('Error de exportación'));
   }
 }
+
+export async function getArticuloExacto(req: Request, res: Response) {
+  const buscar = String(req.query.codigo ?? '').trim().slice(0, 80);
+  const sucursal = String(req.query.sucursal ?? 'TODAS').trim().toUpperCase();
+  if (!buscar || !/^[A-Z0-9 ]{1,20}$/.test(sucursal)) {
+    res.status(400).json({ message: 'Código o sucursal inválidos' });
+    return;
+  }
+  try {
+    const resultado = await listarArticulos({ buscar, sucursal, pagina: 1, limite: 10, exacto: true });
+    res.json({ articulo: resultado.data[0] ?? null });
+  } catch (error) {
+    console.error('Checador de precios:', error);
+    res.status(500).json({ message: 'No fue posible consultar el precio' });
+  }
+}
+
