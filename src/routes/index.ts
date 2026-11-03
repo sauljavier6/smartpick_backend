@@ -3,6 +3,7 @@ import productRoutes from './oc/productRoutes';
 import proveedorRoutes from './oc/proveedorRoutes';
 import ordenCompraRoutes from './oc/ordenCompraRoutes';
 import authRoutes from './auth/authRoutes';
+import auditoriaRoutes from './auditoria/auditoriaRoutes';
 
 import orderTraslateRoutes from './smartpick/orderTraslateRoutes';
 import tranStatusRoutes from './smartpick/tranStatusRoutes';
@@ -13,6 +14,7 @@ import uvaRoutes from './uva/uvaRoutes';
 const router = Router();
 
 router.use('/login', authRoutes);
+router.use('/auditoria', auditoriaRoutes);
 
 // Prefijos para cada grupo de rutas
 router.use('/products', productRoutes);
