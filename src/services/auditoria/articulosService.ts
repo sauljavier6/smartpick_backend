@@ -1,10 +1,7 @@
 import { querySqlServerDP, sql } from "../../config/sqlServerClientDP";
 
-export async function listarArticulos(op: { buscar: string; sucursal: string; pagina: number; limite: number; exacto?: boolean }) {
-  const { buscar, sucursal, pagina, limite, exacto = false } = op;
-  // OPENQUERY no admite parámetros. Solo se permiten identificadores alfanuméricos de sucursal.
-  if (!/^[A-Za-z0-9 ]{1,20}$/.test(sucursal)) throw new Error("Sucursal inválida");
-  const sucursalSql = sucursal.replace(/'/g, "''");
+export async function listarArticulos(op: { buscar: string; pagina: number; limite: number; exacto?: boolean }) {
+  const { buscar, pagina, limite, exacto = false } = op;
   const offset = (pagina - 1) * limite;
   const query = `
     WITH Articulos AS (
@@ -27,13 +24,10 @@ export async function listarArticulos(op: { buscar: string; sucursal: string; pa
           FROM rewards R
           INNER JOIN reward_types RT ON RT.code = R.rewardType
           INNER JOIN promotions P ON P.promotionId = R.promotionId
-          INNER JOIN branch_promotions bp ON bp.promotionId = P.promotionId
-          INNER JOIN branches b ON b.id = bp.branchId
           INNER JOIN records I ON I.promotionId = R.promotionId
           INNER JOIN record_included_items RI ON RI.record_id = I.id
           INNER JOIN items IT ON IT.code = RI.item_code
           WHERE P.startDate <= GETDATE() AND P.endDate >= CAST(GETDATE() AS DATE)
-            AND b.initials IN (''${sucursalSql}'', ''TODAS'')
             AND RT.description <> ''Item Gratis''
             AND (P.description LIKE ''LIQ %'' OR RT.description = ''Precio Fijo'')
         )
