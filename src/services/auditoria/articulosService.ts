@@ -8,7 +8,7 @@ export async function listarArticulos(op: { buscar: string; sucursal: string; pa
   const offset = (pagina - 1) * limite;
   const query = `
     WITH Articulos AS (
-      SELECT articulo, Precio_Venta, tecla, upc, nombreProveedor,
+      SELECT articulo, nombre, Precio_Venta, tecla, upc, nombreProveedor,
         ROW_NUMBER() OVER (PARTITION BY articulo ORDER BY Precio_Venta DESC, nombreProveedor ASC) AS rn
       FROM interfaces_netsuite.dbo.articuloExistencia
       WHERE (@exacto = 1 AND (CAST(articulo AS VARCHAR(80)) = @buscar OR CAST(upc AS VARCHAR(80)) = @buscar))
@@ -41,7 +41,7 @@ export async function listarArticulos(op: { buscar: string; sucursal: string; pa
       ')
     ),
     Resultado AS (
-      SELECT a.articulo AS item_code, p.DESCRIPCION,
+      SELECT a.articulo AS item_code, COALESCE(NULLIF(LTRIM(RTRIM(a.nombre)), ''), p.DESCRIPCION) AS DESCRIPCION,
         a.Precio_Venta, p.PRECIO_ESPECIAL, p.TIPO_PROMO,
         p.description AS PROMOCION, p.Fecha_Ini, p.Fecha_Fin,
         a.tecla, a.upc, a.nombreProveedor,
